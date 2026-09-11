@@ -16,198 +16,170 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
-    
+
     private val repository = DnsRepository(application)
     private val benchmarkEngine = DnsBenchmarkEngine()
     private val scoringEngine = ScoringEngine()
-    
+
     // UI State
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    
+
     // Network info
     private val _networkInfo = MutableStateFlow(NetworkInfo())
     val networkInfo: StateFlow<NetworkInfo> = _networkInfo.asStateFlow()
-    
+
     // Current DNS config
     private val _currentDns = MutableStateFlow(CurrentDnsConfig())
     val currentDns: StateFlow<CurrentDnsConfig> = _currentDns.asStateFlow()
-    
+
+    // Selected provider (for quick connect)
+    private val _selectedProvider = MutableStateFlow<DnsProvider?>(null)
+    val selectedProvider: StateFlow<DnsProvider?> = _selectedProvider.asStateFlow()
+
+    // Top 3 providers for quick select
+    private val _topProviders = MutableStateFlow<List<DnsProvider>>(emptyList())
+    val topProviders: StateFlow<List<DnsProvider>> = _topProviders.asStateFlow()
+
+    // All providers
+    private val _allProviders = MutableStateFlow<List<DnsProvider>>(emptyList())
+    val allProviders: StateFlow<List<DnsProvider>> = _allProviders.asStateFlow()
+
     // Benchmark progress
     private val _benchmarkProgress = MutableStateFlow<BenchmarkProgress>(BenchmarkProgress.Idle)
     val benchmarkProgress: StateFlow<BenchmarkProgress> = _benchmarkProgress.asStateFlow()
-    
+
     // Recommended DNS
     private val _recommendation = MutableStateFlow<RankedResult?>(null)
     val recommendation: StateFlow<RankedResult?> = _recommendation.asStateFlow()
-    
+
     // VPN state
     private val _vpnActive = MutableStateFlow(DnsVpnService.isRunning)
     val vpnActive: StateFlow<Boolean> = _vpnActive.asStateFlow()
-    
+
     init {
         loadNetworkInfo()
+        loadProviders()
         loadLatestBenchmark()
-        observeBenchmarkProgress()
+        observeVpnState()
     }
-    
-    /**
-     * Load current network information.
-     */
+
     private fun loadNetworkInfo() {
         viewModelScope.launch {
             val info = repository.getNetworkInfo()
             _networkInfo.value = info
-            _uiState.value = _uiState.value.copy(isConnected = info.isConnected)
         }
     }
-    
-    /**
-     * Load the latest benchmark result.
-     */
+
+    private fun loadProviders() {
+        viewModelScope.launch {
+            repository.getAllProviders().collect { list ->
+                _allProviders.value = list
+                // Set top 3 for quick select (mix of global + Iranian)
+                _topProviders.value = list.take(3)
+            }
+        }
+    }
+
     private fun loadLatestBenchmark() {
         viewModelScope.launch {
             repository.getAllBenchmarkResults().first().let { results ->
                 if (results.isNotEmpty()) {
-                    val latest = results.first()
-                    val ranked = scoringEngine.rankResults(listOf(latest)).firstOrNull()
-                    _recommendation.value = ranked
-                    _uiState.value = _uiState.value.copy(
-                        lastBenchmarkTime = latest.timestamp,
-                        lastBenchmarkScore = latest.score
-                    )
+                    val ranked = scoringEngine.rankResults(results)
+                    if (ranked.isNotEmpty()) {
+                        _recommendation.value = ranked.first()
+                    }
                 }
             }
         }
     }
-    
-    /**
-     * Observe benchmark engine progress.
-     */
-    private fun observeBenchmarkProgress() {
+
+    private fun observeVpnState() {
         viewModelScope.launch {
-            benchmarkEngine.progress.collect { progress ->
-                _benchmarkProgress.value = progress
-                _uiState.value = _uiState.value.copy(
-                    isBenchmarkRunning = progress is BenchmarkProgress.Testing || 
-                                       progress is BenchmarkProgress.MultiTesting
-                )
+            while (true) {
+                _vpnActive.value = DnsVpnService.isRunning
+                kotlinx.coroutines.delay(1000)
             }
         }
     }
-    
-    /**
-     * Start a quick benchmark of the top 5 providers.
-     */
-    fun startQuickBenchmark() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isBenchmarkRunning = true)
-            
-            try {
-                val providers = repository.getAllProvidersList().take(5)
-                val results = benchmarkEngine.benchmarkAllProviders(providers)
-                
-                // Save results
-                results.forEach { result ->
-                    repository.saveBenchmarkResult(result)
-                }
-                
-                // Find best recommendation
-                val ranked = scoringEngine.rankResults(results)
-                if (ranked.isNotEmpty()) {
-                    _recommendation.value = ranked.first()
-                }
-                
-                loadLatestBenchmark()
-                
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = e.message
-                )
-            } finally {
-                _uiState.value = _uiState.value.copy(isBenchmarkRunning = false)
-            }
-        }
+
+    fun selectProvider(provider: DnsProvider) {
+        _selectedProvider.value = provider
     }
-    
-    /**
-     * Apply a DNS configuration.
-     */
+
     fun applyDns(provider: DnsProvider) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isConnecting = true)
             try {
-                // Start VPN service with selected DNS
                 val intent = Intent(getApplication(), DnsVpnService::class.java).apply {
                     action = DnsVpnService.ACTION_START
                     putExtra(DnsVpnService.EXTRA_DNS_SERVER, provider.ipv4Primary)
                 }
                 getApplication<Application>().startForegroundService(intent)
-                
-                _vpnActive.value = true
+
+                // Wait for VPN to start
+                kotlinx.coroutines.delay(2000)
+
+                _vpnActive.value = DnsVpnService.isRunning
+                _selectedProvider.value = provider
                 _currentDns.value = CurrentDnsConfig(
                     servers = listOf(provider.ipv4Primary, provider.ipv4Secondary),
                     source = DnsConfigSource.VPN
                 )
-                
                 _uiState.value = _uiState.value.copy(
+                    isConnecting = false,
                     activeDnsProvider = provider,
                     isDnsActive = true
                 )
-                
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    errorMessage = "Failed to apply DNS: ${e.message}"
+                    isConnecting = false,
+                    errorMessage = "Failed to connect: ${e.message}"
                 )
             }
         }
     }
-    
-    /**
-     * Disconnect VPN and revert to system DNS.
-     */
+
     fun disconnectDns() {
-        val intent = Intent(getApplication(), DnsVpnService::class.java).apply {
-            action = DnsVpnService.ACTION_STOP
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isConnecting = true)
+            try {
+                val intent = Intent(getApplication(), DnsVpnService::class.java).apply {
+                    action = DnsVpnService.ACTION_STOP
+                }
+                getApplication<Application>().startForegroundService(intent)
+
+                kotlinx.coroutines.delay(1000)
+
+                _vpnActive.value = DnsVpnService.isRunning
+                _currentDns.value = CurrentDnsConfig(source = DnsConfigSource.SYSTEM)
+                _uiState.value = _uiState.value.copy(
+                    isConnecting = false,
+                    activeDnsProvider = null,
+                    isDnsActive = false
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isConnecting = false,
+                    errorMessage = "Failed to disconnect: ${e.message}"
+                )
+            }
         }
-        getApplication<Application>().startForegroundService(intent)
-        
-        _vpnActive.value = false
-        _currentDns.value = CurrentDnsConfig(source = DnsConfigSource.SYSTEM)
-        _uiState.value = _uiState.value.copy(
-            activeDnsProvider = null,
-            isDnsActive = false
-        )
     }
-    
-    /**
-     * Refresh network info.
-     */
-    fun refreshNetworkInfo() {
-        loadNetworkInfo()
-    }
-    
-    /**
-     * Clear error message.
-     */
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
-    
+
     override fun onCleared() {
         super.onCleared()
         benchmarkEngine.cleanup()
     }
 }
 
-/**
- * Home screen UI state.
- */
 data class HomeUiState(
-    val isConnected: Boolean = false,
-    val isBenchmarkRunning: Boolean = false,
+    val isConnecting: Boolean = false,
     val isDnsActive: Boolean = false,
     val activeDnsProvider: DnsProvider? = null,
-    val lastBenchmarkTime: Long = 0L,
-    val lastBenchmarkScore: Double = 0.0,
     val errorMessage: String? = null
 )

@@ -56,7 +56,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun startFullBenchmark() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRunning = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(isBenchmarkRunning = true, errorMessage = null)
             try {
                 val testDomains = _selectedProfile.value?.testDomains ?: DnsBenchmarkEngine.TEST_DOMAINS
                 val provs = _providers.value
@@ -67,7 +67,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = e.message)
             } finally {
-                _uiState.value = _uiState.value.copy(isRunning = false)
+                _uiState.value = _uiState.value.copy(isBenchmarkRunning = false)
             }
         }
     }

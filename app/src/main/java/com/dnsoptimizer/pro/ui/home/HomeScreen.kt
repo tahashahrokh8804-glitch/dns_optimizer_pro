@@ -639,7 +639,7 @@ fun NetworkStatusFooter(
         )
         StatusChip(
             icon = Icons.Filled.Language,
-            label = if (supportsIPv6) "IPv6" : "IPv4",
+            label = if (supportsIPv6) "IPv6" else "IPv4",
             color = if (supportsIPv6) AccentGreen else TextMuted
         )
     }

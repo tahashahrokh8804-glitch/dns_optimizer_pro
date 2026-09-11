@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">بهینه‌ساز DNS حرفه‌ای</string>
+    <string name="home">خانه</string>
+    <string name="benchmark">بنچمارک</string>
+    <string name="dns_list">لیست DNS</string>
+    <string name="profiles">پروفایل‌ها</string>
+    <string name="history">تاریخچه</string>
+    <string name="settings">تنظیمات</string>
+    <string name="start_benchmark">شروع بنچمارک</string>
+    <string name="stop">توقف</string>
+    <string name="connect">اتصال</string>
+    <string name="disconnect">قطع اتصال</string>
+    <string name="apply_dns">اعمال DNS</string>
+    <string name="testing">در حال تست...</string>
+    <string name="network_status">وضعیت شبکه</string>
+    <string name="current_dns">DNS فعلی</string>
+    <string name="recommended">پیشنهادی</string>
+    <string name="no_results">هنوز نتیجه بنچمارکی وجود ندارد</string>
+    <string name="run_benchmark_hint">یک بنچمارک اجرا کنید تا نتایج را اینجا ببینید</string>
+    <string name="update_database">بروزرسانی پایگاه داده</string>
+    <string name="privacy_policy">سیاست حریم خصوصی</string>
+    <string name="about">درباره ما</string>
+    <string name="important_notice">بهینه‌سازی DNS بر حل نام دامنه، مچ‌یابی، ورود و درخواست‌های لانچر تأثیر می‌گذارد. این کار تأخیر بازی پس از برقراری اتصال را کاهش نمی‌دهد.</string>
+    <string name="vpn_active">VPN فعال - مسیریابی DNS فعال</string>
+    <string name="dns_provider_count">%d ارائه‌دهنده موجود</string>
+    <string name="benchmark_result_count">%d نتیجه بنچمارک</string>
+</resources>

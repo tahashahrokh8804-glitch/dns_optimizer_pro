@@ -63,11 +63,11 @@ fun BenchmarkScreen(
         ) {
             Button(
                 onClick = { viewModel.startFullBenchmark() },
-                enabled = !uiState.isRunning,
+                enabled = !uiState.isBenchmarkRunning,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = DarkPrimary)
             ) {
-                if (uiState.isRunning) {
+                if (uiState.isBenchmarkRunning) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
@@ -82,7 +82,7 @@ fun BenchmarkScreen(
                 }
             }
 
-            if (uiState.isRunning) {
+            if (uiState.isBenchmarkRunning) {
                 OutlinedButton(onClick = { viewModel.cancelBenchmark() }) {
                     Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                 }

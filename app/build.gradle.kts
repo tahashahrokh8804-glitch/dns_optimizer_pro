@@ -95,6 +95,9 @@ dependencies {
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    
+    // Lifecycle Compose
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
 
     // Work Manager
     implementation("androidx.work:work-runtime-ktx:2.9.1")

@@ -47,7 +47,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             benchmarkEngine.progress.collect { p ->
                 _progress.value = p
-                _uiState.value = _uiState.value.copy(isRunning = p is BenchmarkProgress.Testing || p is BenchmarkProgress.MultiTesting)
+                _uiState.value = _uiState.value.copy(isBenchmarkRunning = p is BenchmarkProgress.Testing || p is BenchmarkProgress.MultiTesting)
             }
         }
     }
@@ -78,6 +78,6 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 }
 
 data class BenchmarkUiState(
-    val isRunning: Boolean = false,
+    val isBenchmarkRunning: Boolean = false,
     val errorMessage: String? = null
 )

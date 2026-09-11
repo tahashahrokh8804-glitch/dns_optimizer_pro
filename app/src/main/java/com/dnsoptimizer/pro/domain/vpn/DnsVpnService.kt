@@ -48,6 +48,10 @@ class DnsVpnService : VpnService() {
         private const val VPN_MASK = "0"
         private const val VPN_DNS = "8.8.8.8" // Will be replaced with selected DNS
         
+        const val ACTION_START = "com.dnsoptimizer.pro.START_VPN"
+        const val ACTION_STOP = "com.dnsoptimizer.pro.STOP_VPN"
+        const val EXTRA_DNS_SERVER = "dns_server"
+        
         var isRunning = false
             private set
         
@@ -345,11 +349,5 @@ class DnsVpnService : VpnService() {
                 .setOngoing(true)
                 .build()
         }
-    }
-    
-    companion object {
-        const val ACTION_START = "com.dnsoptimizer.pro.START_VPN"
-        const val ACTION_STOP = "com.dnsoptimizer.pro.STOP_VPN"
-        const val EXTRA_DNS_SERVER = "dns_server"
     }
 }

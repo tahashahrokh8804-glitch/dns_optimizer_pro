@@ -509,7 +509,7 @@ class DnsBenchmarkEngine {
         val question = mutableListOf<Byte>()
         
         // Transaction ID
-        val transactionId = (Math.random() * 65535).toInt().toShort()
+        val transactionId = (Math.random() * 65535).toInt()
         question.addAll(listOf(
             (transactionId shr 8).toByte(),
             (transactionId and 0xFF).toByte()

@@ -35,13 +35,13 @@ class DnsRepository(private val context: Context) {
     
     init {
         // Initialize with bundled database on first run
-        initializeDatabase()
+        kotlinx.coroutines.runBlocking { initializeDatabase() }
     }
     
     /**
      * Initialize database with bundled providers if empty.
      */
-    private fun initializeDatabase() {
+    private suspend fun initializeDatabase() {
         try {
             val count = providerDao.getActiveProviderCount()
             if (count == 0) {

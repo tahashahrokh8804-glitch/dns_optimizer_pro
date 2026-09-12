@@ -377,7 +377,7 @@ fun SelectedDnsPanel(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isActive) "Active DNS" : "Selected DNS",
+                        text = if (isActive) "Active DNS" else "Selected DNS",
                         style = MaterialTheme.typography.labelMedium,
                         color = TextGray
                     )

@@ -39,253 +39,328 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val networkInfo by viewModel.networkInfo.collectAsStateWithLifecycle()
-    val currentDns by viewModel.currentDns.collectAsStateWithLifecycle()
-    val recommendation by viewModel.recommendation.collectAsStateWithLifecycle()
     val vpnActive by viewModel.vpnActive.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
+    val topProviders by viewModel.topProviders.collectAsStateWithLifecycle()
+    val recommendation by viewModel.recommendation.collectAsStateWithLifecycle()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(BackgroundDeep, BackgroundMid, BackgroundDeep)
-                )
-            )
+            .background(BgVoid)
     ) {
+        // Subtle gradient overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            AccentGlow.copy(alpha = 0.03f),
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = Float.POSITIVE_INFINITY
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header
-            Text(
-                text = "DNS Optimizer",
-                style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Gaming DNS Protection",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextMuted
-            )
+            Spacer(modifier = Modifier.height(48.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // === MAIN CONNECTION BUTTON ===
-            ConnectionButton(
-                isActive = vpnActive,
-                isConnecting = uiState.isConnecting,
-                onToggle = {
-                    if (vpnActive) {
-                        viewModel.disconnectDns()
-                    } else {
-                        selectedProvider?.let { viewModel.applyDns(it) }
-                    }
-                }
-            )
-
-            // Connection status text
-            ConnectionStatusText(
-                isActive = vpnActive,
-                isConnecting = uiState.isConnecting,
-                providerName = selectedProvider?.name ?: currentDns.servers.firstOrNull() ?: "System DNS"
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // === CURRENT DNS INFO CARD ===
-            DnsInfoCard(
-                provider = selectedProvider,
-                isActive = vpnActive,
-                networkType = networkInfo.networkType,
+            // ═══ TOP BAR ═══
+            TopBar(
+                isConnected = vpnActive,
                 networkName = networkInfo.networkName
             )
 
-            // === QUICK DNS SELECTOR ===
-            QuickDnsSelector(
-                providers = viewModel.topProviders.collectAsStateWithLifecycle().value,
-                selectedProvider = selectedProvider,
-                onProviderSelected = { viewModel.selectProvider(it) },
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // ═══ MAIN CONNECTION CIRCLE ═══
+            ConnectionCircle(
+                isActive = vpnActive,
+                isConnecting = uiState.isConnecting,
+                providerName = selectedProvider?.name ?: "System DNS",
+                onToggle = {
+                    if (vpnActive) viewModel.disconnectDns()
+                    else selectedProvider?.let { viewModel.applyDns(it) }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ═══ SELECTED DNS INFO ═══
+            SelectedDnsPanel(
+                provider = selectedProvider,
+                isActive = vpnActive,
+                networkType = networkInfo.networkType
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ═══ QUICK SELECT ═══
+            QuickSelectRow(
+                providers = topProviders,
+                selectedId = selectedProvider?.id,
+                onSelect = { viewModel.selectProvider(it) },
                 onSeeAll = onNavigateToDnsList
             )
 
-            // === RECOMMENDATION CARD ===
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ═══ RECOMMENDATION ═══
             recommendation?.let { rec ->
-                RecommendationCard(
-                    rankedResult = rec,
-                    onApply = { provider ->
-                        viewModel.selectProvider(provider)
-                        viewModel.applyDns(provider)
+                RecommendCard(
+                    name = rec.result.providerName,
+                    score = rec.score.toInt(),
+                    latency = rec.result.medianLatencyMs.toInt(),
+                    protocol = rec.result.protocol.displayName,
+                    reason = rec.recommendation,
+                    onConnect = {
+                        viewModel.selectProvider(
+                            com.dnsoptimizer.pro.data.model.DnsProvider(
+                                id = rec.result.providerId,
+                                name = rec.result.providerName,
+                                ipv4Primary = "",
+                                ipv4Secondary = ""
+                            )
+                        )
+                        // Trigger connect
                     }
                 )
             }
 
-            // === ACTION BUTTONS ===
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionButton(
-                    icon = Icons.Filled.Speed,
-                    label = "Benchmark",
-                    subtitle = "Test DNS",
-                    onClick = onNavigateToBenchmark,
-                    modifier = Modifier.weight(1f)
-                )
-                ActionButton(
-                    icon = Icons.Filled.Dns,
-                    label = "DNS List",
-                    subtitle = "All providers",
-                    onClick = onNavigateToDnsList,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // === NETWORK STATUS ===
-            NetworkStatusFooter(
-                isConnected = networkInfo.isConnected,
-                networkType = networkInfo.networkType,
-                supportsIPv6 = networkInfo.supportsIPv6
+            // ═══ ACTION GRID ═══
+            ActionGrid(
+                onBenchmark = onNavigateToBenchmark,
+                onDnsList = onNavigateToDnsList,
+                onProfiles = { /* navigate to profiles */ }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ═══ NETWORK STATUS ═══
+            NetworkBar(
+                isConnected = networkInfo.isConnected,
+                networkType = networkInfo.networkType,
+                ipv6 = networkInfo.supportsIPv6
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
 
 @Composable
-fun ConnectionButton(
-    isActive: Boolean,
-    isConnecting: Boolean,
-    onToggle: () -> Unit
-) {
-    val pulseAnim = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by pulseAnim.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isActive) 1.08f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
-    val glowAlpha by pulseAnim.animateFloat(
-        initialValue = 0.3f,
-        targetValue = if (isActive) 0.6f else 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAlpha"
-    )
-
-    val buttonColor by animateColorAsState(
-        targetValue = when {
-            isConnecting -> Connecting
-            isActive -> Connected
-            else -> Disconnected
-        },
-        animationSpec = tween(300),
-        label = "buttonColor"
-    )
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(180.dp)
+fun TopBar(isConnected: Boolean, networkName: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Outer glow ring
-        if (isActive) {
-            Box(
-                modifier = Modifier
-                    .size((180 * pulseScale).dp)
-                    .clip(CircleShape)
-                    .background(ConnectedGlow.copy(alpha = glowAlpha))
+        Column {
+            Text(
+                text = "DNS Optimizer",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextWhite,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp
+            )
+            Text(
+                text = "Gaming DNS Protection",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextDim
             )
         }
 
-        // Main button
+        // Status pill
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = if (isConnected) StateConnected.copy(alpha = 0.12f) else BgElevated
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(if (isConnected) StateConnected else StateDisconnected)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isConnected) "Protected" else "Unprotected",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isConnected) StateConnected else TextDim,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ConnectionCircle(
+    isActive: Boolean,
+    isConnecting: Boolean,
+    providerName: String,
+    onToggle: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "conn")
+
+    // Pulse animation
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isActive) 1.15f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    // Glow opacity
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = if (isActive) 0.35f else 0.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    // Rotation for connecting state
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing)
+        ),
+        label = "rotation"
+    )
+
+    val ringColor by animateColorAsState(
+        targetValue = when {
+            isConnecting -> StateConnecting
+            isActive -> StateConnected
+            else -> StateDisconnected
+        },
+        animationSpec = tween(400),
+        label = "ringColor"
+    )
+
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) {
+        // Outer glow
+        if (isActive) {
+            Box(
+                modifier = Modifier
+                    .size((200 * pulseScale).dp)
+                    .clip(CircleShape)
+                    .background(StateGlow.copy(alpha = glowAlpha))
+            )
+        }
+
+        // Ring border
         Box(
             modifier = Modifier
-                .size(140.dp)
+                .size(180.dp)
+                .clip(CircleShape)
+                .border(
+                    width = 3.dp,
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            ringColor.copy(alpha = 0.8f),
+                            ringColor.copy(alpha = 0.2f),
+                            ringColor.copy(alpha = 0.8f)
+                        )
+                    ),
+                    shape = CircleShape
+                )
+        )
+
+        // Inner gradient
+        Box(
+            modifier = Modifier
+                .size(170.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            buttonColor.copy(alpha = 0.3f),
-                            buttonColor.copy(alpha = 0.1f)
+                            ringColor.copy(alpha = 0.08f),
+                            BgDeep
                         )
                     )
-                )
-                .border(3.dp, buttonColor.copy(alpha = 0.5f), CircleShape)
-                .clickable { onToggle() },
+                ),
             contentAlignment = Alignment.Center
         ) {
-            if (isConnecting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(60.dp),
-                    color = Connecting,
-                    strokeWidth = 3.dp
-                )
-            } else {
-                Icon(
-                    imageVector = if (isActive) Icons.Filled.PowerSettingsNew else Icons.Filled.Power,
-                    contentDescription = if (isActive) "Disconnect" else "Connect",
-                    tint = buttonColor,
-                    modifier = Modifier.size(60.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (isConnecting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = StateConnecting,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isActive) Icons.Filled.LinkOff else Icons.Filled.Link,
+                        contentDescription = null,
+                        tint = ringColor,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = when {
+                        isConnecting -> "Connecting"
+                        isActive -> "Connected"
+                        else -> "Tap to Connect"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ringColor,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
     }
-}
 
-@Composable
-fun ConnectionStatusText(
-    isActive: Boolean,
-    isConnecting: Boolean,
-    providerName: String
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // Provider name below circle
+    if (isActive || isConnecting) {
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = when {
-                isConnecting -> "Connecting..."
-                isActive -> "Connected"
-                else -> "Disconnected"
-            },
-            style = MaterialTheme.typography.headlineSmall,
-            color = when {
-                isConnecting -> Connecting
-                isActive -> Connected
-                else -> TextMuted
-            },
-            fontWeight = FontWeight.Bold
+            text = providerName,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextGray,
+            textAlign = TextAlign.Center
         )
-        if (isActive || isConnecting) {
-            Text(
-                text = providerName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-        }
     }
 }
 
 @Composable
-fun DnsInfoCard(
+fun SelectedDnsPanel(
     provider: DnsProvider?,
     isActive: Boolean,
-    networkType: NetworkType,
-    networkName: String
+    networkType: NetworkType
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = BgMid),
+        shape = RoundedCornerShape(16.dp),
+        border = if (isActive) ButtonDefaults.outlinedButtonBorder.copy(
+            brush = Brush.linearGradient(listOf(BorderConnected, BorderConnected))
+        ) else null
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -298,69 +373,94 @@ fun DnsInfoCard(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(if (isActive) Connected else Disconnected)
+                            .background(if (isActive) StateConnected else StateDisconnected)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Active DNS",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                        text = if (isActive) "Active DNS" : "Selected DNS",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextGray
                     )
                 }
+                // Network badge
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = when (networkType) {
-                        NetworkType.WIFI -> AccentCyan.copy(alpha = 0.1f)
-                        NetworkType.MOBILE -> AccentOrange.copy(alpha = 0.1f)
-                        else -> SurfaceDark
+                        NetworkType.WIFI -> Accent.copy(alpha = 0.1f)
+                        NetworkType.MOBILE -> Orange.copy(alpha = 0.1f)
+                        else -> BgElevated
                     }
                 ) {
-                    Text(
-                        text = networkName,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = when (networkType) {
-                            NetworkType.WIFI -> AccentCyan
-                            NetworkType.MOBILE -> AccentOrange
-                            else -> TextMuted
-                        }
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            when (networkType) {
+                                NetworkType.WIFI -> Icons.Filled.Wifi
+                                NetworkType.MOBILE -> Icons.Filled.SignalCellularAlt
+                                else -> Icons.Filled.HelpOutline
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = when (networkType) {
+                                NetworkType.WIFI -> Accent
+                                NetworkType.MOBILE -> Orange
+                                else -> TextDim
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = networkType.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when (networkType) {
+                                NetworkType.WIFI -> Accent
+                                NetworkType.MOBILE -> Orange
+                                else -> TextDim
+                            }
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            provider?.let { p ->
+            if (provider != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
                         Text(
-                            text = p.name,
+                            text = provider.name,
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary,
+                            color = TextWhite,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = p.ipv4Primary,
+                            text = provider.ipv4Primary,
                             style = MaterialTheme.typography.bodySmall,
-                            color = AccentCyan
+                            color = Accent
                         )
                     }
-                    Column(horizontalAlignment = Alignment.End) {
+                    // Category badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = BgElevated
+                    ) {
                         Text(
-                            text = p.category.name,
+                            text = provider.category.name,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
+                            color = TextDim
                         )
                     }
                 }
-            } ?: run {
+            } else {
                 Text(
-                    text = "Select a DNS provider to connect",
+                    text = "Tap a provider below to select",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextMuted
+                    color = TextDim
                 )
             }
         }
@@ -368,10 +468,10 @@ fun DnsInfoCard(
 }
 
 @Composable
-fun QuickDnsSelector(
+fun QuickSelectRow(
     providers: List<DnsProvider>,
-    selectedProvider: DnsProvider?,
-    onProviderSelected: (DnsProvider) -> Unit,
+    selectedId: String?,
+    onSelect: (DnsProvider) -> Unit,
     onSeeAll: () -> Unit
 ) {
     Column {
@@ -382,14 +482,14 @@ fun QuickDnsSelector(
         ) {
             Text(
                 text = "Quick Select",
-                style = MaterialTheme.typography.titleSmall,
-                color = TextSecondary,
+                style = MaterialTheme.typography.labelLarge,
+                color = TextGray,
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = "See All",
+                text = "See All →",
                 style = MaterialTheme.typography.labelMedium,
-                color = AccentCyan,
+                color = Accent,
                 modifier = Modifier.clickable { onSeeAll() }
             )
         }
@@ -401,10 +501,11 @@ fun QuickDnsSelector(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             providers.take(3).forEach { provider ->
-                QuickDnsChip(
-                    provider = provider,
-                    isSelected = selectedProvider?.id == provider.id,
-                    onClick = { onProviderSelected(provider) },
+                QuickChip(
+                    name = provider.name,
+                    ip = provider.ipv4Primary,
+                    isSelected = provider.id == selectedId,
+                    onClick = { onSelect(provider) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -413,8 +514,9 @@ fun QuickDnsSelector(
 }
 
 @Composable
-fun QuickDnsChip(
-    provider: DnsProvider,
+fun QuickChip(
+    name: String,
+    ip: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -423,9 +525,9 @@ fun QuickDnsChip(
         modifier = modifier,
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) AccentCyan.copy(alpha = 0.15f) else CardBackground,
+        color = if (isSelected) Accent.copy(alpha = 0.1f) else BgMid,
         border = if (isSelected) ButtonDefaults.outlinedButtonBorder.copy(
-            brush = Brush.linearGradient(listOf(AccentCyan, AccentCyan))
+            brush = Brush.linearGradient(listOf(Accent, Accent))
         ) else null
     ) {
         Column(
@@ -433,16 +535,17 @@ fun QuickDnsChip(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = provider.name.take(8),
+                text = name.take(10),
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isSelected) AccentCyan else TextPrimary,
+                color = if (isSelected) Accent else TextWhite,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = provider.ipv4Primary,
+                text = ip,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextMuted,
+                color = TextDim,
                 fontSize = 10.sp
             )
         }
@@ -450,13 +553,17 @@ fun QuickDnsChip(
 }
 
 @Composable
-fun RecommendationCard(
-    rankedResult: com.dnsoptimizer.pro.domain.benchmark.RankedResult,
-    onApply: (DnsProvider) -> Unit
+fun RecommendCard(
+    name: String,
+    score: Int,
+    latency: Int,
+    protocol: String,
+    reason: String,
+    onConnect: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        colors = CardDefaults.cardColors(containerColor = BgMid),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -464,14 +571,14 @@ fun RecommendationCard(
                 Icon(
                     Icons.Filled.AutoAwesome,
                     contentDescription = null,
-                    tint = AccentCyan,
-                    modifier = Modifier.size(20.dp)
+                    tint = Accent,
+                    modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Recommended for Your Network",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = TextSecondary
+                    text = "Recommended for You",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextGray
                 )
             }
 
@@ -479,9 +586,9 @@ fun RecommendationCard(
 
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = AccentCyan.copy(alpha = 0.05f),
+                color = Accent.copy(alpha = 0.04f),
                 border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = Brush.linearGradient(listOf(AccentCyan.copy(alpha = 0.3f), AccentBlue.copy(alpha = 0.3f)))
+                    brush = Brush.linearGradient(listOf(BorderAccent, BorderAccent))
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -492,26 +599,26 @@ fun RecommendationCard(
                     ) {
                         Column {
                             Text(
-                                text = rankedResult.result.providerName,
+                                text = name,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary,
+                                color = TextWhite,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = rankedResult.result.protocol.displayName,
+                                text = protocol,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AccentCyan
+                                color = Accent
                             )
                         }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = QualityExcellent.copy(alpha = 0.15f)
+                            color = RateExcellent.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = "${rankedResult.score.toInt()}%",
+                                text = "$score%",
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = QualityExcellent,
+                                color = RateExcellent,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -523,30 +630,35 @@ fun RecommendationCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        MetricItem("Median", "${rankedResult.result.medianLatencyMs.toInt()} ms")
-                        MetricItem("Min", "${rankedResult.result.minLatencyMs.toInt()} ms")
-                        MetricItem("Success", "${rankedResult.result.successRate.toInt()}%")
+                        StatItem("Latency", "${latency}ms")
+                        StatItem("Protocol", protocol)
+                        StatItem("Score", "$score%")
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Why: ${rankedResult.recommendation}",
+                        text = reason,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
+                        color = TextDim
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Button(
-                        onClick = { /* Will be wired to apply */ },
+                        onClick = onConnect,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
-                        shape = RoundedCornerShape(12.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp)
                     ) {
                         Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Connect to ${rankedResult.result.providerName}", color = BackgroundDeep, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Connect to $name",
+                            color = BgVoid,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -555,98 +667,125 @@ fun RecommendationCard(
 }
 
 @Composable
-fun MetricItem(label: String, value: String) {
+fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleSmall,
-            color = TextPrimary,
+            color = TextWhite,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = TextMuted
+            color = TextDim
         )
     }
 }
 
 @Composable
-fun ActionButton(
+fun ActionGrid(
+    onBenchmark: () -> Unit,
+    onDnsList: () -> Unit,
+    onProfiles: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        ActionTile(
+            icon = Icons.Filled.Speed,
+            label = "Benchmark",
+            sub = "Test DNS",
+            onClick = onBenchmark,
+            modifier = Modifier.weight(1f)
+        )
+        ActionTile(
+            icon = Icons.Filled.Dns,
+            label = "DNS List",
+            sub = "20+ providers",
+            onClick = onDnsList,
+            modifier = Modifier.weight(1f)
+        )
+        ActionTile(
+            icon = Icons.Filled.Gamepad,
+            label = "Profiles",
+            sub = "Gaming presets",
+            onClick = onProfiles,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+fun ActionTile(
     icon: ImageVector,
     label: String,
-    subtitle: String,
+    sub: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    Surface(
         modifier = modifier,
         onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(14.dp),
+        color = BgMid
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = AccentCyan,
-                modifier = Modifier.size(24.dp)
+            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextWhite,
+                fontWeight = FontWeight.Medium
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-            }
+            Text(
+                text = sub,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextDim
+            )
         }
     }
 }
 
 @Composable
-fun NetworkStatusFooter(
+fun NetworkBar(
     isConnected: Boolean,
     networkType: NetworkType,
-    supportsIPv6: Boolean
+    ipv6: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        StatusChip(
+        StatusDot(
             icon = if (isConnected) Icons.Filled.Wifi else Icons.Filled.WifiOff,
             label = if (isConnected) "Online" else "Offline",
-            color = if (isConnected) Connected else Error
+            color = if (isConnected) StateConnected else StateError
         )
-        StatusChip(
+        StatusDot(
             icon = when (networkType) {
                 NetworkType.WIFI -> Icons.Filled.SignalWifi4Bar
                 NetworkType.MOBILE -> Icons.Filled.SignalCellularAlt
                 else -> Icons.Filled.HelpOutline
             },
             label = networkType.name,
-            color = AccentCyan
+            color = Accent
         )
-        StatusChip(
+        StatusDot(
             icon = Icons.Filled.Language,
-            label = if (supportsIPv6) "IPv6" else "IPv4",
-            color = if (supportsIPv6) AccentGreen else TextMuted
+            label = if (ipv6) "IPv6" else "IPv4",
+            color = if (ipv6) Green else TextDim
         )
     }
 }
 
 @Composable
-fun StatusChip(
+fun StatusDot(
     icon: ImageVector,
     label: String,
     color: Color
@@ -654,20 +793,11 @@ fun StatusChip(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .background(SurfaceDark, RoundedCornerShape(8.dp))
+            .background(BgElevated, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(14.dp)
-        )
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
         Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = color
-        )
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = color)
     }
 }
